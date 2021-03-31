@@ -10,7 +10,7 @@ The dataset contains for each input sample
 
 In total there a 5 splits: Train, Validation, Test split with 10 in-distribution classes and a valdidation out-of-distribution dataset, as well as a out-of-distribution test set with 60 classes each.
 
-The dataset with generated indices can be downloaded via the Releases.
+The dataset with generated indices can be downloaded via [Kaggle](https://www.kaggle.com/svenel/genomics-ood).
 
 ### Attribution
 The original dataset was released by
