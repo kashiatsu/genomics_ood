@@ -1,15 +1,9 @@
 import json
 from pathlib import Path
-from numpy.core.numeric import full
 
 import torch
+import numpy as np
 from tfrecord.torch.dataset import MultiTFRecordDataset
-
-
-def full_transform(item, transform, target_transform):
-    x = torch.from_numpy(transform(item["x"].copy()))
-    y = torch.from_numpy(target_transform(item["y"].copy()))
-    return x, y
 
 
 class OODGenomicsDataset(torch.utils.data.IterableDataset):
@@ -28,7 +22,8 @@ class OODGenomicsDataset(torch.utils.data.IterableDataset):
 
     def __init__(self, data_root, split="train", transform=None, target_transform=None):
         if isinstance(data_root, str):
-            self.data_root = Path(data_root)
+            data_root = Path(data_root)
+        self.data_root = data_root / "llr_ood_genomics"
 
         assert split in self.splits, f"Split '{split}' does not exist."
         split_dir = self.data_root / self.splits[split]
@@ -46,15 +41,26 @@ class OODGenomicsDataset(torch.utils.data.IterableDataset):
             label_dict = json.load(f)
             self.label_dict = {v: k for k, v in label_dict.items()}
 
-        transform = transform if transform is not None else lambda x: x 
-        target_transform = target_transform if target_transform is not None else lambda x: x 
-        self.full_transform = lambda x: full_transform(x, transform, target_transform)
+        transform = transform if transform is not None else lambda x: x
+        target_transform = (
+            target_transform if target_transform is not None else lambda x: x
+        )
+        self.data_transform = lambda x: self.full_transform(
+            x, transform, target_transform
+        )
+
+    @staticmethod
+    def full_transform(item, transform, target_transform):
+        dec = np.array([int(i) for i in item["x"].tobytes().decode("utf-8").split(" ")])
+        x = torch.from_numpy(transform(dec.copy())).float()
+        y = torch.from_numpy(target_transform(item["y"].copy())).long().squeeze()
+        return x, y
 
     def __iter__(self):
-        return map(self.full_transform, self.ds.__iter__())
+        return map(self.data_transform, self.ds.__iter__())
 
 
 if __name__ == "__main__":
-    ds = OODGenomicsDataset("./data/llr_ood_genomics", "train")
+    ds = OODGenomicsDataset("./data", "train")
     print(next(iter(ds)))
     print(ds.label_dict)
