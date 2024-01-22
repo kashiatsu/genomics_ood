@@ -10,11 +10,12 @@ class model_CNN(nn.Module): # 途中
                  kernel_size = 20):
         super().__init__()
         self.seq_len = seq_len
+        print("seq_len: ", self.seq_len)
     
         self.conv_net = nn.Sequential(
             nn.Conv1d(4, num_filters, kernel_size = kernel_size), # 畳み込み(長さ20の畳み込みフィルタを1000枚), ゼロパディング, stride = 1
             nn.ReLU(inplace = True),
-            nn.MaxPool1d(kernel_size = kernel_size), # 最大プーリング(kernel_sizeは一緒じゃなくてもいい)
+            nn.MaxPool1d(kernel_size = kernel_size), # 最大プーリング(kernel_sizeは一緒じゃなくてもいい), 最大じゃなくていい
             nn.Flatten(),
             nn.Linear(num_filters * (seq_len - kernel_size + 1), 1000) # 全結合(入力: , 出力: 1000ニューロン)
         )
