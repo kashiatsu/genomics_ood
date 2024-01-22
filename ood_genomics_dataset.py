@@ -48,10 +48,12 @@ class OODGenomicsDataset(torch.utils.data.IterableDataset):
         self.data_transform = lambda x: self.full_transform(
             x, transform, target_transform
         )
+        
 
     @staticmethod
     def full_transform(item, transform, target_transform):
-        dec = np.array([int(i) for i in item["x"].tobytes().decode("utf-8").split(" ")])
+        
+        dec = np.array([int(i) for i in item["x"].decode("utf-8").split(" ")])
         x = torch.from_numpy(transform(dec.copy())).float()
         y = torch.from_numpy(target_transform(item["y"].copy())).long().squeeze()
         return x, y
@@ -59,8 +61,9 @@ class OODGenomicsDataset(torch.utils.data.IterableDataset):
     def __iter__(self):
         return map(self.data_transform, self.ds.__iter__())
 
-
 if __name__ == "__main__":
-    ds = OODGenomicsDataset("./data", "train")
-    print(next(iter(ds)))
-    print(ds.label_dict)
+    ds = OODGenomicsDataset("data", "train")
+    # print("ds: ", ds.full_transform)
+    # print(next(iter(ds)))
+    # print(ds.label_dict)
+    
