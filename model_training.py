@@ -8,6 +8,7 @@ from tfrecord.tools import tfrecord2idx
 import mymodel_cnn # CNN
 import ood_genomics_dataset
 from torch.utils.data import DataLoader
+from sklearn.preprocessing import OneHotEncoder
 
 # use GPU if available
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -19,42 +20,97 @@ ood_valid = ood_genomics_dataset.OODGenomicsDataset("data", "val_ood") #between_
 in_test = ood_genomics_dataset.OODGenomicsDataset("data", "test") # after_2016_in_test
 ood_test = ood_genomics_dataset.OODGenomicsDataset("data", "test_ood") #after_2016_ood_test
 
-# ラベル
-train_label = train.label_dict
-in_valid_label = in_valid.label_dict
-ood_valid_label = ood_valid.label_dict
-in_test_label = in_test.label_dict
-ood_test_label = ood_test.label_dict
+# batch_size
+BATCH_SIZE = 32
 
-train_dl = DataLoader(train, batch_size = 32)
-in_valid_dl = DataLoader(in_valid, batch_size = 32)
-ood_valid_dl = DataLoader(ood_valid, batch_size = 32)
+# Dataloder
+train_dl = DataLoader(train, batch_size = BATCH_SIZE)
+in_valid_dl = DataLoader(in_valid, batch_size = BATCH_SIZE)
+ood_valid_dl = DataLoader(ood_valid, batch_size = BATCH_SIZE)
 
 # モデルと損失関数
 
-# train用の損失関数
-def train_loss_function(train_dl, model, loss_function, epochs, optimizer):
-    a
-
-def run_model(train_dl, in_valid_dl, ood_valid_dl, model, lr, epochs):
-    # optimizer
-    optimizer = torch.optim.AdamW(params = model.parameters(),
-                              lr = lr, weight_decay = 0.01)
-    # loss function
-    loss_function = torch.nn.MSELoss()
+# one-hot-encoding
+def one_hot_encoding(data_seq_minibatch):
+    data_seq_minibatch = data_seq_minibatch.to(torch.int64) # int型に変換
+    data_seq_one_hots = []
     
-    # 損失関数の配列
+    for i in range(BATCH_SIZE):
+        data_seq_one_hot = nn.functional.one_hot(data_seq_minibatch[i])
+        data_seq_one_hots.append(data_seq_one_hot[i])
+        
+    return data_seq_one_hots
+
+def make_train_loss(train_dl, epochs, lr):
+    train_losses = []
+    
+    
+    
+    for epoch, data in enumerate(train_dl):
+        # Every data instance is an input + label pair
+        train_seq_minibatch, train_label_minibatch = data # train
+        train_seq_minibatch = one_hot_encoding(train_seq_minibatch)
+        
+        print(len(train_seq_minibatch))
+        print(len(train_label_minibatch))
+        
+        model = mymodel_cnn.model_CNN(len(train_seq_minibatch))
+        model.to(DEVICE)
+        
+        # optimizer
+        optimizer = torch.optim.AdamW(params = model.parameters(),
+                              lr = lr, weight_decay = 0.01)
+        # loss function
+        loss_function = torch.nn.MSELoss()
+        
+        # Zero your gradients for every batch
+        optimizer.zero_grad()
+
+        # Make predictions for this batch
+        outputs = model(train_seq_minibatch)
+
+        # Compute the loss and its gradients
+        train_loss = loss_function(outputs, train_label_minibatch)
+        
+        train_losses.append(train_loss)
+        train_loss.backward()
+
+        # Adjust learning weights
+        optimizer.step()
+
+def run_model(train_dl, in_valid_dl, ood_valid_dl, epochs, lr):
+    # 損失の配列
     train_losses = []
     in_valid_losses = []
     ood_valid_losses = []
     
-    print("train_seq: ", next(iter(train))[0][0])
+    # train_loss
+    train_losses = make_train_loss(train_dl, epochs, lr)
     
-    for epoch in range(epochs):
+    assert False
+        
+    # for epoch in range(epochs):
+        # train_seq = next(iter(train_dl))
+    
+    for epoch, data in enumerate(train_dl):
+        # Every data instance is an input + label pair
+        train_seq_minibatch, train_label_minibatch = data # train
+
+        
+        train_seq_minibatch = one_hot_encoding(train_seq_minibatch)
+        # print("mini: ", train_seq_minibatch)
+        # print("ここまでOK")
+        
+        assert False
+        
+        # print("train_seq1: ", train_seq.shape)
+        # print("train_label: ", train_label)
         # train_loss_functionとvalid_loss_functionを作る
-        train_loss = loss_function(train_dl)
-        in_valid_loss = loss_function(in_valid_dl)
-        ood_valid_loss = loss_function(ood_valid_dl)
+        train_seq_pred = model(train_seq_minibatch)
+        train_loss = loss_function(train_seq_pred, train_label_minibatch)
+        
+        # in_valid_loss = loss_function(in_valid_dl)
+        # ood_valid_loss = loss_function(ood_valid_dl)
         
         optimizer.zero_grad() # 勾配を初期化
         train_loss.backward() # 勾配を計算
@@ -65,17 +121,14 @@ def run_model(train_dl, in_valid_dl, ood_valid_dl, model, lr, epochs):
         ood_valid_losses.append(ood_valid_loss)
         print(f"E{epoch} | train loss: {train_loss:.3f} | in valid loss: {in_valid_loss:.3f} | ood valid loss: {ood_valid_loss:.3f}")
         
-        return train_losses, in_valid_losses, ood_valid_losses
+    return train_losses, in_valid_losses, ood_valid_losses
 
-def training_roop(train_dl, in_valid_dl, ood_valid_dl): # 途中
-    seq_len = len(next(iter(train_dl))[0][0])
-    model = mymodel_cnn.model_CNN(seq_len)
-    model.to(DEVICE)
+def training_loop(train_dl, in_valid_dl, ood_valid_dl): # 途中
     lr = 0.001 # 学習率
     epochs = 10 # エポック数
     
-    train_losses, in_valid_losses, ood_valid_losses = run_model(train_dl, in_valid_dl, ood_valid_dl, model, lr, epochs)
+    train_losses, in_valid_losses, ood_valid_losses = run_model(train_dl, in_valid_dl, ood_valid_dl, epochs, lr)
     return train_losses, in_valid_losses, ood_valid_losses
     
     
-train_losses, valid_losses = training_roop(train_dl, in_valid_dl, ood_valid_dl)
+train_losses, valid_losses = training_loop(train_dl, in_valid_dl, ood_valid_dl)
