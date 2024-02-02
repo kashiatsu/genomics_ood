@@ -54,7 +54,7 @@ def make_train_loss(train_dl, epochs, lr):
         print(len(train_seq_minibatch))
         print(len(train_label_minibatch))
         
-        model = mymodel_cnn.model_CNN(len(train_seq_minibatch))
+        model = mymodel_cnn.model_CNN(train_seq_minibatch)
         model.to(DEVICE)
         
         # optimizer
@@ -67,7 +67,7 @@ def make_train_loss(train_dl, epochs, lr):
         optimizer.zero_grad()
 
         # Make predictions for this batch
-        outputs = model(train_seq_minibatch)
+        outputs = model.forward(train_seq_minibatch)
 
         # Compute the loss and its gradients
         train_loss = loss_function(outputs, train_label_minibatch)
