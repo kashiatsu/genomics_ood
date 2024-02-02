@@ -36,5 +36,6 @@ class model_CNN(nn.Module): # 途中
         # この後にFlatten_Linearにoutを送る
         out = self.Flatten_Linear(out)
         print("out: ", out.shape())
+        # kahi
         return out
     
