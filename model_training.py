@@ -68,7 +68,7 @@ def make_train_loss(train_dl, epochs, lr):
         optimizer.zero_grad()
 
         # Make predictions for this batch
-        outputs = model(train_seq_minibatch)
+        outputs = model.forward(train_seq_minibatch)
 
         # Compute the loss and its gradients
         train_loss = loss_function(outputs, train_label_minibatch)
