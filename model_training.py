@@ -51,10 +51,10 @@ def make_train_loss(train_dl, epochs, lr):
         train_seq_minibatch, train_label_minibatch = data # train
         train_seq_minibatch = one_hot_encoding(train_seq_minibatch)
         
-        print(len(train_seq_minibatch))
-        print(len(train_label_minibatch))
+        # print(len(train_seq_minibatch))
+        # print(len(train_label_minibatch))
         
-        model = mymodel_cnn.model_CNN(train_seq_minibatch)
+        model = mymodel_cnn.model_CNN(len(train_seq_minibatch))
         model.to(DEVICE)
         
         # optimizer
