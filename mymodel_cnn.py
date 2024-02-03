@@ -29,12 +29,16 @@ class model_CNN(nn.Module): # 途中
         
     
     def forward(self, xb):
-        xb = xb.permute(0, 2, 1) # 次元の並び替え(今度決める)
+        # xb = xb.permute(0, 2, 1) # 次元の並び替え(今度決める)
+        # print("self: ", self)
+        # print("xb: ", xb)
+        # assert False
         out = self.conv_net(xb)
-        print("out: ", out.shape())
+        print("out: ", out.shape)
         out = torch.max(out, dim = 1) # 最大プーリング(各配列ごとの最大値をとる)
+        print("out: ", out.shape)
         # この後にFlatten_Linearにoutを送る
         out = self.Flatten_Linear(out)
-        print("out: ", out.shape())
+        print("out: ", out.shape)
         return out
     
