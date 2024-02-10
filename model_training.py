@@ -60,8 +60,6 @@ def one_hot_encoding(data_seq_minibatch):
 def make_train_loss_one_epoch(train_dl, lr):
     train_losses = [] #trainの損失を格納するリスト
     
-    epoch = EPOCHS
-    
     model = mymodel_cnn.model_CNN(250) # 250 = train_seq_minibatch.shape[2]
     model.to(DEVICE)
     
@@ -232,11 +230,12 @@ def training_loop(train_dl, in_valid_dl, ood_valid_dl): # 途中
     lr = 0.001 # 学習率
     
     for epoch in range(EPOCHS):
+        print("epoch: ", epoch + 1)
         train_losses, in_valid_losses, ood_valid_losses = run_model(train_dl, in_valid_dl, ood_valid_dl, lr)
         loss_plot(train_losses, in_valid_losses, ood_valid_losses, epoch)
     
     print("trainig conplete!")
     
-train_losses, in_valid_losses, ood_valid_losses = training_loop(train_dl, in_valid_dl, ood_valid_dl)
+training_loop(train_dl, in_valid_dl, ood_valid_dl)
 
 
