@@ -10,6 +10,11 @@ import ood_genomics_dataset
 from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import GPUtil
+from tqdm import tqdm  # (進捗を可視化)
+
+# 見やすくするために 環境 -> 関数 -> 値 の定義
+
+# functions
 
 def get_most_freemem_gpu(): # 一番空いているGPUを使うようにする
     max_mem_ = 0
@@ -22,28 +27,10 @@ def get_most_freemem_gpu(): # 一番空いているGPUを使うようにする
         i += 1
     return(max_id_)
 
-DEVICE = get_most_freemem_gpu()
-print("device = ", DEVICE)
 
-torch.cuda.set_device(DEVICE)
 
-# データの読み込み
-train = ood_genomics_dataset.OODGenomicsDataset("data", "train") # before_2011_in_tr
-in_valid = ood_genomics_dataset.OODGenomicsDataset("data", "val") # between_2011-2016_in_valid
-ood_valid = ood_genomics_dataset.OODGenomicsDataset("data", "val_ood") #between_2011-2016_ood_valid
-in_test = ood_genomics_dataset.OODGenomicsDataset("data", "test") # after_2016_in_test
-ood_test = ood_genomics_dataset.OODGenomicsDataset("data", "test_ood") #after_2016_ood_test
 
-# batch_size
-BATCH_SIZE = 32
 
-# epochs
-EPOCHS = 10
-
-# Dataloder
-train_dl = DataLoader(train, batch_size = BATCH_SIZE)
-in_valid_dl = DataLoader(in_valid, batch_size = BATCH_SIZE)
-ood_valid_dl = DataLoader(ood_valid, batch_size = BATCH_SIZE)
 
 # モデルと損失関数
 
@@ -57,15 +44,11 @@ def one_hot_encoding(data_seq_minibatch):
     data_seq_one_hot = data_seq_one_hot.to(torch.float32) # floatに戻す
     return data_seq_one_hot
 
-def make_train_loss_one_epoch(train_dl, lr):
+def make_train_loss_one_epoch(train_dl, model, optimizer, epoch):
     train_losses = [] #trainの損失を格納するリスト
     
-    model = mymodel_cnn.model_CNN(250) # 250 = train_seq_minibatch.shape[2]
-    model.to(DEVICE)
+    # ここじゃなくて最初に定義
     
-    # optimizer
-    optimizer = torch.optim.AdamW(params = model.parameters(),
-                                   lr = lr, weight_decay = 0.01)
     # loss function
     loss_function = torch.nn.MSELoss()
     
@@ -88,30 +71,28 @@ def make_train_loss_one_epoch(train_dl, lr):
 
         # Compute the loss and its gradients
         train_loss = loss_function(train_outputs[0], train_label_minibatch)
-        train_losses.append(train_loss)
+        train_losses.append(train_loss) # add loss to list
         train_loss.backward()
 
         # Adjust learning weights
         optimizer.step()
         
         if i % 5000 == 0:
-            print(f"E{i} | train loss: {train_loss:.3f}")
+            print(f"epoch: {epoch} | E{i} | train loss: {train_loss:.3f}")
+            
     
     print("train_loss is OK!")
     return train_losses
 
-def make_valid_loss_one_epoch(in_valid_dl, ood_valid_dl, lr):
+def make_valid_loss_one_epoch(in_valid_dl, ood_valid_dl, model, epoch):
     in_valid_losses = []
     ood_valid_losses = []
     
-    model = mymodel_cnn.model_CNN(250)
-    model.to(DEVICE)
     
-    # optimizer
-    optimizer = torch.optim.AdamW(params = model.parameters(),
-                            lr = lr, weight_decay = 0.01)
     # loss function
     loss_function = torch.nn.MSELoss()
+    
+    # 勾配もいらない
     
     for i, data in enumerate(in_valid_dl): # in_valid
         # Every data instance is an input + label pair
@@ -122,34 +103,25 @@ def make_valid_loss_one_epoch(in_valid_dl, ood_valid_dl, lr):
         
         in_valid_seq_minibatch = one_hot_encoding(in_valid_seq_minibatch) # one_hot
         
-        # Zero your gradients for every batch
-        optimizer.zero_grad()
+        with torch.no_grad():
+            # Make predictions for this batch
+            in_valid_outputs = model.forward(in_valid_seq_minibatch)
 
-        # Make predictions for this batch
-        in_valid_outputs = model.forward(in_valid_seq_minibatch)
+            # Compute the loss and its gradients
+            in_valid_loss = loss_function(in_valid_outputs[0], in_valid_label_minibatch)
+        
+            in_valid_losses.append(in_valid_loss)
 
-        # Compute the loss and its gradients
-        in_valid_loss = loss_function(in_valid_outputs[0], in_valid_label_minibatch)
-        
-        in_valid_losses.append(in_valid_loss)
-        in_valid_loss.backward()
-        
-        # Adjust learning weights
-        optimizer.step()
-        
         if i % 5000 == 0:
-            print(f"E{i} | in valid loss: {in_valid_loss:.3f}")
+            print(f"epoch: {epoch} | E{i} | in valid loss: {in_valid_loss:.3f}")
+        
+        
         
     print("in_valid_loss is OK!")
 
 
     # ood_valid
-    model = mymodel_cnn.model_CNN(ood_valid_seq_minibatch.shape[2])
-    model.to(DEVICE)
     
-    # optimizer
-    optimizer = torch.optim.AdamW(params = model.parameters(),
-                            lr = lr, weight_decay = 0.01)
     # loss function
     loss_function = torch.nn.MSELoss()
     
@@ -164,37 +136,34 @@ def make_valid_loss_one_epoch(in_valid_dl, ood_valid_dl, lr):
         
         
         
-        # Zero your gradients for every batch
-        optimizer.zero_grad()
+        with torch.no_grad():
+            # Make predictions for this batch
+            ood_valid_outputs = model.forward(ood_valid_seq_minibatch)
 
-        # Make predictions for this batch
-        ood_valid_outputs = model.forward(ood_valid_seq_minibatch)
+            # Compute the loss and its gradients
+            ood_valid_loss = loss_function(ood_valid_outputs[0], ood_valid_label_minibatch)
+        
+            ood_valid_losses.append(ood_valid_loss)
 
-        # Compute the loss and its gradients
-        ood_valid_loss = loss_function(ood_valid_outputs, ood_valid_label_minibatch)
-        
-        ood_valid_losses.append(ood_valid_loss)
-        ood_valid_loss.backward()
-        
-        # Adjust learning weights
-        optimizer.step()
-        
         if i % 5000 == 0:
-            print(f"E{i} | ood valid loss: {ood_valid_loss:.3f}")
+            print(f"epoch: {epoch} | E{i} | ood valid loss: {ood_valid_loss:.3f}")
+        
+
 
     print("ood_valid_loss is OK!")
     return in_valid_losses, ood_valid_losses    
 
-def run_model(train_dl, in_valid_dl, ood_valid_dl, lr):
+def run_model(train_dl, in_valid_dl, ood_valid_dl, model, optimizer, epoch):
     # 損失の配列
     train_losses = []
     in_valid_losses = []
     ood_valid_losses = []
     
     # train_loss
-    train_losses = make_train_loss_one_epoch(train_dl, lr)
+    train_losses = make_train_loss_one_epoch(train_dl, model, optimizer, epoch)
     # in_valid_loss, ood_valid_loss
-    in_valid_losses, ood_valid_losses = make_valid_loss_one_epoch(in_valid_dl, ood_valid_dl, lr)
+    in_valid_losses, ood_valid_losses = make_valid_loss_one_epoch(in_valid_dl, ood_valid_dl, model, epoch)
+    # validでは学習率, optmizerは不要
     
     return train_losses, in_valid_losses, ood_valid_losses
     
@@ -228,14 +197,47 @@ def loss_plot(train_loss, in_valid_loss, ood_valid_loss, epochs):
 
 def training_loop(train_dl, in_valid_dl, ood_valid_dl): # 途中
     lr = 0.001 # 学習率
+    model = mymodel_cnn.model_CNN(250) # 250 = train_seq_minibatch.shape[2]
+    model = model.to(DEVICE)
+    
+    # optimizer(train用)
+    optimizer = torch.optim.AdamW(params = model.parameters(),
+                            lr = lr, weight_decay = 0.01)
+    
     
     for epoch in range(EPOCHS):
         print("epoch: ", epoch + 1)
-        train_losses, in_valid_losses, ood_valid_losses = run_model(train_dl, in_valid_dl, ood_valid_dl, lr)
+        
+        # epochの前にモデル、optimizerなどを定義する(後でやるといちいち初期化している)
+        
+        train_losses, in_valid_losses, ood_valid_losses = run_model(train_dl, in_valid_dl, ood_valid_dl, model, optimizer, epoch)
         loss_plot(train_losses, in_valid_losses, ood_valid_losses, epoch)
     
     print("trainig conplete!")
     
+
+DEVICE = get_most_freemem_gpu()
+print("device = ", DEVICE)
+
+torch.cuda.set_device(DEVICE)
+    
+
+# データの読み込み
+train = ood_genomics_dataset.OODGenomicsDataset("data", "train") # before_2011_in_tr
+in_valid = ood_genomics_dataset.OODGenomicsDataset("data", "val") # between_2011-2016_in_valid
+ood_valid = ood_genomics_dataset.OODGenomicsDataset("data", "val_ood") #between_2011-2016_ood_valid
+in_test = ood_genomics_dataset.OODGenomicsDataset("data", "test") # after_2016_in_test
+ood_test = ood_genomics_dataset.OODGenomicsDataset("data", "test_ood") #after_2016_ood_test
+
+# batch_size
+BATCH_SIZE = 32
+
+# epochs
+EPOCHS = 10
+
+# Dataloder
+train_dl = DataLoader(train, batch_size = BATCH_SIZE)
+in_valid_dl = DataLoader(in_valid, batch_size = BATCH_SIZE)
+ood_valid_dl = DataLoader(ood_valid, batch_size = BATCH_SIZE)
+
 training_loop(train_dl, in_valid_dl, ood_valid_dl)
-
-
