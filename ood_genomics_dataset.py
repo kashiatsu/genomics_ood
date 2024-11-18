@@ -60,9 +60,14 @@ class OODGenomicsDataset(torch.utils.data.IterableDataset):
 
     def __iter__(self):
         return map(self.data_transform, self.ds.__iter__())
+    
+    # def __len__(self):
+        
+    
+    
 
 if __name__ == "__main__":
     ds = OODGenomicsDataset("data", "train")
-    print(next(iter(ds)))
+    # print(next(iter(ds)))
     # print(ds.label_dict)
-    
+    print(ds.ds)

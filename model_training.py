@@ -52,7 +52,7 @@ def make_train_loss_one_epoch(train_dl, model, optimizer, epoch):
     # loss function
     loss_function = torch.nn.MSELoss()
     
-    for i, data in enumerate(train_dl):
+    for i, data in enumerate(tqdm(train_dl)):
         # Every data instance is an input + label pair
         train_seq_minibatch, train_label_minibatch = data # train
         train_seq_minibatch = train_seq_minibatch.to(DEVICE) # deviceを統一
@@ -196,7 +196,7 @@ def loss_plot(train_loss, in_valid_loss, ood_valid_loss, epochs):
     
 
 def training_loop(train_dl, in_valid_dl, ood_valid_dl): # 途中
-    lr = 0.001 # 学習率
+    lr = 0.005 # 学習率
     model = mymodel_cnn.model_CNN(250) # 250 = train_seq_minibatch.shape[2]
     model = model.to(DEVICE)
     
@@ -230,7 +230,7 @@ in_test = ood_genomics_dataset.OODGenomicsDataset("data", "test") # after_2016_i
 ood_test = ood_genomics_dataset.OODGenomicsDataset("data", "test_ood") #after_2016_ood_test
 
 # batch_size
-BATCH_SIZE = 32
+BATCH_SIZE = 100
 
 # epochs
 EPOCHS = 10
@@ -239,5 +239,7 @@ EPOCHS = 10
 train_dl = DataLoader(train, batch_size = BATCH_SIZE)
 in_valid_dl = DataLoader(in_valid, batch_size = BATCH_SIZE)
 ood_valid_dl = DataLoader(ood_valid, batch_size = BATCH_SIZE)
+
+# print("len: ", len(train_dl))
 
 training_loop(train_dl, in_valid_dl, ood_valid_dl)
